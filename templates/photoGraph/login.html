@@ -1,0 +1,58 @@
+{% extends 'photoGraph/base.html' %}
+{% load static %}
+{% load template_tags %}
+
+{% block title_block %}
+    Login
+{% endblock %}
+
+{% block custom_head %}
+<style>
+    #main-content {
+        max-width: max-content;
+    }
+
+    input[type=text], input[type=password]{
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+</style>
+
+{% endblock %}
+
+{% block body_block %}
+<h1>Login to photoGraph</h1>
+{% if messages %}
+    <ul class="messages">
+        {% for message in messages %}
+            <li>{{ message }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+<form id="login_form" method="post" action="{% url 'main:login' %}">
+    {% csrf_token %}
+
+    
+    Username:<br> <input type="text" name="username" value="{{ username }}" size="50" placeholder="Username" />
+    <br />
+    Password: <br><input type="password" name="password" value="" size="50" placeholder="Password"/>
+    <br />
+    <br>
+    <input type="hidden" name="next" value="" size="50" id="next"/>
+    <input type="submit" value="Submit" />
+</form><br/>
+<a href="{% url 'main:signup' %}" id="signup-link-login">Or sign-up...</a>
+
+<script>
+    let next = (new URL(window.location)).searchParams.get("next");
+    if (next != "" && next != null) {
+        document.getElementById("next").value = next;
+        document.getElementById("signup-link-login").href += "?next=" + encodeURIComponent(next);
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends 'photoGraph/base.html' %}
+{% load static %}
+{% load template_tags %}
+
+{% block title_block %}
+    Report User
+{% endblock %}
+
+{% block custom_head %}
+<style>
+  #main-content {
+      max-width: 600px;
+  }
+  .custom-textarea {
+    width: 100%; 
+    resize: none;
+  }
+</style>
+{% endblock %}
+
+{% block body_block %}
+    <h2>Report User</h2>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
+    {% if reported_user_profile.biography %}
+        <p><b>{{ reported_user_profile }}'s description:</b> {{ reported_user_profile.biography }}</p>
+    {% endif %}
+    <div style="display: flex; margin-top: -10px;">
+        <div>
+            <p><b>{{ reported_user_profile }}'s profile picture:</b></p><br>
+        </div>
+        <img src="{{ reported_user_profile.profile_picture.url }}" alt="User Profile Picture" style="width: 300px; margin-left: 20px; margin-top: 20px;">    
+    </div>
+
+    <form method="post" action="{% url 'main:report_user' reported_user_profile.slug %}">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <br>
+        <button type="submit">Submit Report</button>
+    </form>
+
+    {% if show_popup %}
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Report submitted successfully!',
+                    showConfirmButton: true,
+                    confirmButtonText: "OK" 
+                }).then(() => {
+                    window.location.href = '{% url "main:show_user_profile" reported_user_profile.slug %}';
+                });
+            });
+        </script>
+    {% endif %}
+{% endblock %}

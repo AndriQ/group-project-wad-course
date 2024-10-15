@@ -1,0 +1,200 @@
+{% extends 'photoGraph/base.html' %}
+{% load static %}
+{% load template_tags %}
+
+{% block title_block %}
+Home
+{% endblock %}
+
+{% block custom_head %}
+<style>
+    #main-content {
+        height: calc(100% - 106px);
+        width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    #map {
+        min-width: 100px;
+        min-height: 100px;
+        width: 100%;
+        height: 100%;
+    }
+
+    .loc-detail {
+        max-height: 70vh;
+        max-width: 90vw;
+    }
+
+    .leaflet-popup-content-wrapper {
+        overflow-y: scroll;
+    }
+
+    .leaflet-popup-close-button {
+        margin-right: 15px;
+    }
+
+    #create-button {
+        position: absolute;
+        right: 10px;
+        z-index: 999;
+        margin-top: 10px;
+    }
+</style>
+
+<style id="style-marker"></style>
+{% endblock %}
+
+{% block body_block %}
+<button id="create-button">Create post</button>
+<div id="map"></div>
+
+<!-- TODO: Move scripting to separate file -->
+<script>
+    var map;
+    var req;
+    var createMarker;
+    var createMode = false;
+    var reqBusy = false;
+    var reqQueued = false;
+    var postSet = new Set();
+
+    function setupMap() {
+        try {
+            map = L.map('map').setView([55.87261821643929, -4.2900009], 17);
+
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+        } catch (e) {
+            if (e.toString() == "ReferenceError: L is not defined")
+                document.getElementById("map").innerHTML = "<h1 style='margin: 50px'>Unable to load map - check your internet connection.</h1>";
+            else
+                throw e;
+        }
+    }
+
+    function addLocations(locations) {
+        // Remove posts from dataset that are already on map
+        Object.keys(locations).forEach((locationName) => {
+            locations[locationName] = locations[locationName].filter((post) => !postSet.has(post.photo_url));
+        });
+
+        Object.keys(locations).forEach((locationName) => {
+            if (locations[locationName].length > 0) {
+                let locationHTML = `
+                    <div class="loc-detail">
+                        <span class="post-location">&#128205; <a href="${locations[locationName][0].location_url}">${locationName}</a></span><br/>`
+
+                locations[locationName].forEach((post) => {
+                    postSet.add(post.photo_url);
+                    locationHTML += `
+                        <div class="post">
+                            <a href="${post.post_url}" target="_blank"><img src="${post.photo_url}"/></a><br/>
+                            <span class="post-title">&#128247; ${post.caption}</span>
+                            <span class="post-info-primary"><a href="${post.user_url}">${post.user_name}</a></span>
+                            <span class="post-info-secondary">${post.likes} likes, taken ${post.date}</span>
+                            <a href="${post.post_url}" class="post-link">View more...</a><br/>
+                        </div>`;
+                    /*  { url 'main:view_post' post.post_slug }*/
+                });
+
+                locationHTML += "</div>"
+                let popup = L.popup().setContent(locationHTML);
+
+                L.marker([locations[locationName][0].lat, locations[locationName][0].lon], {
+                    icon: new L.DivIcon({
+                        className: "custom-marker-icon",
+                        html: `<img src="${locations[locationName][0].photo_url}"/><span>${locations[locationName].length}</span>`,
+                        iconSize: [70, 70],
+                        iconAnchor: [35, 0],
+                        popupAnchor: [0, 0]
+                    }),
+                    riseOnHover: true
+                }).addTo(map)
+                    .bindPopup(popup);
+            }
+        });
+    }
+
+    function makeRequest() {
+        if (!reqBusy) {
+            req = new XMLHttpRequest();
+            req.addEventListener("load", () => {
+                var locationsBackend = JSON.parse(req.response);
+                addLocations(locationsBackend);
+                reqBusy = false;
+
+                if (reqQueued) {
+                    reqQueued = false;
+                    makeRequest();
+                }
+            });
+
+            // Get map bounds for parameter
+            let bounds = map.getBounds();
+            let northWest = bounds.getNorthWest();
+            let southEast = bounds.getSouthEast();
+
+            reqBusy = true;
+            req.open("GET", `/photoGraph/get_posts_json?nwLat=${northWest.lat}&nwLon=${northWest.lng}&seLat=${southEast.lat}&seLon=${southEast.lng}`);
+            req.send();
+        } else {
+            reqQueued = true;
+        }
+    }
+
+    // Hide markers and don't make requests when zoomed out too far
+    function onMapTransform(e) {
+        if (map.getZoom() >= 13) {
+            document.getElementById("style-marker").innerText = "";
+            makeRequest();
+        } else {
+            document.getElementById("style-marker").innerText = ".custom-marker-icon { display: none; }";
+        }
+    }
+
+    function onCreateClick(e) {
+        if (createMode) {
+            if (createMarker != undefined) {
+                createMarker.remove();
+            }
+
+            createMarker = L.marker(e.latlng).addTo(map)
+            .bindPopup(
+                L.popup().setContent(`<a href="/photoGraph/create_post?lat=${e.latlng.lat}&lng=${e.latlng.lng}"><button>Add post here</button></a>`)
+            )
+            .openPopup()
+            .on("popupclose", (e) => {createMarker.remove()});
+        }
+    }
+
+    function createOn() {
+        createMode = true;
+        document.getElementById("create-button").onclick = (e) => createOff();
+        map.on("click", onCreateClick);
+        document.getElementById("create-button").innerHTML = "Select a location on the map";
+    }
+
+    function createOff() {
+        createMode = false;
+        
+        if (createMarker != undefined) {
+            createMarker.remove();
+        }
+
+        map.on("click", (e) => {});
+        document.getElementById("create-button").innerHTML = "Create post";
+        document.getElementById("create-button").onclick = (e) => createOn();
+    }
+
+    setupMap();
+    makeRequest();
+
+    map.on("zoomend", onMapTransform);
+    map.on("moveend", onMapTransform);
+
+    document.getElementById("create-button").onclick = (e) => createOn();
+</script>
+{% endblock %}

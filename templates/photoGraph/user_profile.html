@@ -1,0 +1,23 @@
+{% extends 'photoGraph/base.html' %}
+{% load static %}
+{% load template_tags %}
+{% block title_block %}
+    {{ user_profile }}'s Profile
+{% endblock %}
+
+{% block body_block %}
+    <div class="reportUserLinkContainer">
+        <p id="reportUserLink"><a href="{% url 'main:report_user' user_profile.slug %}">Report User</a></p>
+    </div>
+    {% account_detail_template user_profile False %}
+    <br>
+    <hr>
+    <h3>{{ user_profile }}'s Posts</h3>
+
+    {% if posts %}
+	    {% post_template posts False %}
+    {% else %}
+        <p>{{ user_profile }} hasn't posted yet.</p>
+    {% endif %}
+    
+{% endblock %}
